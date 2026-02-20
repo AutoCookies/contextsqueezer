@@ -25,7 +25,7 @@ func TestJSONSchemaTextField(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &m); err != nil {
 		t.Fatalf("invalid json: %v", err)
 	}
-	required := []string{"bytes_in", "bytes_out", "tokens_in_approx", "tokens_out_approx", "reduction_pct", "aggressiveness", "profile", "budget_applied", "truncated", "source_type", "warnings"}
+	required := []string{"schema_version", "engine_version", "build", "bytes_in", "bytes_out", "tokens_in_approx", "tokens_out_approx", "reduction_pct", "aggressiveness", "profile", "budget_applied", "truncated", "source_type", "warnings"}
 	for _, k := range required {
 		if _, ok := m[k]; !ok {
 			t.Fatalf("missing key %s", k)
@@ -69,7 +69,7 @@ func TestProfileCommandOutput(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("profile failed: %s", errb.String())
 	}
-	s := out.String()
+	s := errb.String()
 	if !strings.Contains(s, "total time ms:") || !strings.Contains(s, "peak memory estimate bytes:") {
 		t.Fatalf("unexpected profile output: %s", s)
 	}
@@ -82,7 +82,7 @@ func TestBenchSuiteOutput(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("bench failed: %s", errb.String())
 	}
-	s := out.String()
+	s := errb.String()
 	if !strings.Contains(s, "| file | aggr | run |") || !strings.Contains(s, "| file | aggr | min ms") {
 		t.Fatalf("unexpected bench output: %s", s)
 	}

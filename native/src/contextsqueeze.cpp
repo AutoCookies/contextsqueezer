@@ -17,7 +17,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.2.0";
+constexpr const char* kVersion = "1.0.0";
 
 struct Span {
   size_t start;

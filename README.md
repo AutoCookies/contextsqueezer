@@ -4,7 +4,15 @@ Deterministic Go CLI + C++ core for document compression.
 
 ## Version
 
-Current release: **1.2.0**.
+Current release: **1.0.0**.
+
+## Guarantees
+
+- Deterministic output for identical input/options.
+- Drop-only behavior (no sentence reordering, no rewriting).
+- Anchors preserved unless budget truncation is required.
+- `MaxTokens` is honored with deterministic fallback truncation.
+- No external network/model calls; processing is local.
 
 ## Build & Test
 
@@ -12,6 +20,7 @@ Current release: **1.2.0**.
 ./scripts/build.sh
 ./scripts/test.sh
 ./scripts/format.sh
+./scripts/verify_no_binaries.sh
 ```
 
 ## Supported Formats
@@ -21,7 +30,7 @@ Current release: **1.2.0**.
 - HTML
 - TXT/MD
 
-## Core Usage
+## CLI Usage
 
 ```bash
 ./build/bin/contextsqueeze --max-tokens 8000 --profile api doc.pdf
@@ -29,20 +38,15 @@ Current release: **1.2.0**.
 ./build/bin/contextsqueeze stats --source docx --max-tokens 2000 report.docx
 ```
 
-## Benchmark Harness (Phase 4)
+## Bench Harness
 
 ```bash
-./build/bin/contextsqueeze bench --suite default --runs 5 --warmup 1 --aggr 0..9 --max-tokens 0
-./build/bin/contextsqueeze bench --file testdata/bench/large.txt --runs 10 --aggr 6
-./build/bin/contextsqueeze bench --dir testdata/bench --pattern "*.txt" --runs 3
+./build/bin/contextsqueeze bench --suite default --runs 5 --warmup 1 --aggr 0..9
+./build/bin/contextsqueeze bench --file testdata/bench/large.txt --runs 10
+./build/bin/contextsqueeze bench --dir testdata/bench --pattern "*.txt"
 ```
 
-Bench output includes:
-
-- per-run rows
-- aggregate rows (min/median/p95)
-- SHA-256 digest checks for determinism (bench fails on mismatch)
-- optional JSON via `--json`
+Bench checks deterministic SHA-256 digests per run and exits non-zero on mismatch.
 
 ## Profiling
 
@@ -50,53 +54,63 @@ Bench output includes:
 ./build/bin/contextsqueeze profile --cpu out/cpu.pprof --heap out/heap.pprof --seconds 10 testdata/bench/large.txt
 ```
 
-Open pprof UI:
+Open profile UI:
 
 ```bash
 go tool pprof -http=:0 out/cpu.pprof
 ```
 
-## Stats/Stage Timings
+## Exit Codes
 
-`stats` prints stage timing and counters, including:
+- `0` success
+- `2` usage error
+- `3` input error
+- `4` parse error
+- `5` timeout
+- `6` internal error
 
-- ingest
-- segmentation
-- tokenization
-- candidate filtering
-- similarity
-- pruning
-- assembly
-- cross-chunk registry
-- budgeting
+## Logging Policy
 
-## JSON Schema (Stable)
+- `stdout`: squeezed text only (or JSON when `--json`)
+- `stderr`: errors, warnings, stats, profiling output
+- `--quiet`: suppress warnings
+- `--verbose`: print stage timing
+- `CSQ_DEBUG=1`: include stack traces for failures
 
-`--json` output remains stable and includes:
+## JSON Schema Lock
 
-- `bytes_in`, `bytes_out`
-- `tokens_in_approx`, `tokens_out_approx`
-- `reduction_pct`
-- `aggressiveness`, `profile`
-- `budget_applied`, `truncated`
-- `source_type`, `warnings`
-- `text` (valid UTF-8) OR `text_b64`
+`--json` includes stable fields:
+
+- `schema_version` (locked to `1`)
+- `engine_version` (`1.0.0`)
+- `build` object
+- existing compression metadata (`bytes_*`, `tokens_*`, `reduction_pct`, `aggressiveness`, `profile`, `budget_applied`, `truncated`, `source_type`, `warnings`)
+- `text` or `text_b64`
 
 ## Token Approximation
 
 `approx_tokens = ceil(bytes/4) + whitespace_word_count`
 
-## Guardrails
+## Release Packaging
 
-- Input size cap default: `50MB` (`CSQ_MAX_BYTES` to override)
-- CLI timeout: `5s`
-- Unknown binary-like files rejected
-- Soft memory ceiling default: `1024MB` (`--max-memory-mb`)
+Generate local artifacts (not committed):
+
+```bash
+./scripts/release.sh
+```
+
+Outputs in `dist/`:
+
+- `contextsqueeze_linux_amd64`
+- `contextsqueeze_darwin_amd64`
+- `contextsqueeze_darwin_arm64`
+- `SHA256SUMS`
+- `VERSION`
 
 ## Troubleshooting
 
 - Scanned/image-only PDFs are not OCR-processed.
-- DOCX must contain `word/document.xml` (or parseable XML fallback fixture format).
+- DOCX must contain `word/document.xml`.
 - Linux runtime linking:
   ```bash
   export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
@@ -106,4 +120,4 @@ go tool pprof -http=:0 out/cpu.pprof
   export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
   ```
 
-See `docs/perf.md` for reproducible performance workflows.
+See `docs/perf.md` for benchmark/profiling workflows.

@@ -42,8 +42,8 @@ func TestLargeDocDeterministicAndFast(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 10*time.Second {
 		t.Fatalf("too slow: %v", elapsed)
 	}
-	if r1.Timings.PeakMem > int64(1024)*1024*1024 {
-		t.Fatalf("memory estimate too high: %d", r1.Timings.PeakMem)
+	if r1.Metrics.PeakMemoryEstimateB > int64(1024)*1024*1024 {
+		t.Fatalf("memory estimate too high: %d", r1.Metrics.PeakMemoryEstimateB)
 	}
 }
 

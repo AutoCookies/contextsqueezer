@@ -2,6 +2,13 @@ package api
 
 import "fmt"
 
+type NativeMetrics struct {
+	TokensParsed         uint64
+	SentencesTotal       uint64
+	SimilarityCandidates uint64
+	SimilarityPairs      uint64
+}
+
 type Options struct {
 	Aggressiveness int
 	MaxTokens      int

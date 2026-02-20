@@ -16,13 +16,6 @@ import (
 	"unsafe"
 )
 
-type NativeMetrics struct {
-	TokensParsed         uint64
-	SentencesTotal       uint64
-	SimilarityCandidates uint64
-	SimilarityPairs      uint64
-}
-
 func csqVersion() string {
 	return C.GoString(C.csq_version())
 }

@@ -21,6 +21,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Verify repository hygiene
+        run: ./scripts/verify_no_binaries.sh
+
       - name: Ensure CMake
         run: cmake --version
 
@@ -32,3 +35,20 @@ jobs:
 
       - name: Format/Lint
         run: ./scripts/format.sh
+
+      - name: Acceptance (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: ./scripts/acceptance.sh
+
+  sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build (required for CLI path)
+        run: ./scripts/build.sh
+      - name: Sanitizer gate
+        run: ./scripts/sanitize.sh
