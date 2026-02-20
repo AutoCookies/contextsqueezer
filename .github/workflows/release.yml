@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify no binaries
+        run: ./scripts/verify_no_binaries.sh
+
+      - name: Build and test
+        run: |
+          ./scripts/build.sh
+          ./scripts/test.sh
+
+      - name: Sanitizer
+        run: ./scripts/sanitize.sh
+
+      - name: Release packaging
+        run: ./scripts/release.sh
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextsqueeze-release
+          path: |
+            dist/contextsqueeze_linux_amd64
+            dist/contextsqueeze_darwin_amd64
+            dist/contextsqueeze_darwin_arm64
+            dist/SHA256SUMS
+            dist/VERSION

@@ -1,0 +1,6 @@
+# DUPLICATES
+Cache reduces latency for requests.
+Cache reduces latency for requests.
+Cache reduces latency for requests.
+Caching reduces latency for requests in services.
+Caching reduces latency for requests in services.

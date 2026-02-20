@@ -1,0 +1,11 @@
+# LARGE
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.
+This is a larger deterministic fixture with repeated lines for profiling.

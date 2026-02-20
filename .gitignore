@@ -1,0 +1,14 @@
+build/
+dist/
+
+# Native/shared artifacts
+*.so
+*.dylib
+*.exe
+*.out
+
+# Go
+*.test
+
+# macOS
+.DS_Store
