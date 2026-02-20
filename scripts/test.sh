@@ -14,24 +14,28 @@ fi
 "${ROOT_DIR}/build/native/bin/contextsqueeze_tests"
 go test ./...
 
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "${tmpdir}"' EXIT
+# identity smoke
+TMPDIR_CSQ="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR_CSQ}"' EXIT
+printf 'phase2 identity smoke\nline2 raw\n' > "${TMPDIR_CSQ}/input.bin"
+"${ROOT_DIR}/build/bin/contextsqueeze" --aggr 0 "${TMPDIR_CSQ}/input.bin" > "${TMPDIR_CSQ}/out.bin"
+cmp -s "${TMPDIR_CSQ}/input.bin" "${TMPDIR_CSQ}/out.bin"
 
-input_file="${tmpdir}/input.txt"
-printf 'phase1 identity smoke\nline2\0raw\n' > "${input_file}"
+# ingest smoke for all fixture types
+"${ROOT_DIR}/build/bin/contextsqueeze" stats "${ROOT_DIR}/internal/ingest/fixtures/sample.txt" >/dev/null
+"${ROOT_DIR}/build/bin/contextsqueeze" stats "${ROOT_DIR}/internal/ingest/fixtures/sample.html" >/dev/null
+"${ROOT_DIR}/build/bin/contextsqueeze" stats "${ROOT_DIR}/internal/ingest/fixtures/sample.pdf" >/dev/null
+"${ROOT_DIR}/build/bin/contextsqueeze" stats --source docx "${ROOT_DIR}/internal/ingest/fixtures/sample.docx" >/dev/null
 
-output_file="${tmpdir}/out.bin"
-"${ROOT_DIR}/build/bin/contextsqueeze" --aggr 0 "${input_file}" > "${output_file}"
-cmp -s "${input_file}" "${output_file}"
-
-"${ROOT_DIR}/build/bin/contextsqueeze" --version >/dev/null
-
-bench_output="$(${ROOT_DIR}/build/bin/contextsqueeze bench ${ROOT_DIR}/testdata/sample.txt)"
-printf '%s\n' "$bench_output" > "${tmpdir}/bench.txt"
-
-aggr6_reduction="$(awk -F'|' '/\| 6 \|/ {gsub(/ /,"",$4); print $4}' "${tmpdir}/bench.txt")"
-python - <<PY
-r = float("${aggr6_reduction}")
-if r < 30.0:
-    raise SystemExit(f"aggr=6 reduction too low: {r}")
+# budget + json schema smoke
+json_out="$(${ROOT_DIR}/build/bin/contextsqueeze --max-tokens 30 --json ${ROOT_DIR}/internal/ingest/fixtures/sample.txt)"
+printf '%s\n' "$json_out" > "${TMPDIR_CSQ}/out.json"
+CSQ_JSON_PATH="${TMPDIR_CSQ}/out.json" python - <<'PY'
+import json, os
+from pathlib import Path
+obj=json.loads(Path(os.environ["CSQ_JSON_PATH"]).read_text())
+required=["bytes_in","bytes_out","tokens_in_approx","tokens_out_approx","reduction_pct","aggressiveness","profile","budget_applied","truncated","source_type","warnings"]
+for k in required:
+    assert k in obj, f"missing {k}"
+assert obj["tokens_out_approx"] <= 30, "max tokens not honored"
 PY

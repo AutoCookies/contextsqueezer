@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Docx Heading</w:t></w:r></w:p>
+    <w:p><w:r><w:t>First paragraph from docx fixture.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Second paragraph from docx fixture.</w:t></w:r></w:p>
+  </w:body>
+</w:document>

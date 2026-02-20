@@ -1,0 +1,6 @@
+# SAMPLE TEXT
+
+This is a plain text fixture.
+This is a plain text fixture.
+
+Visit https://example.com/reference for docs.

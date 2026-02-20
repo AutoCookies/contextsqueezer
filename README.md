@@ -1,6 +1,10 @@
 # Context-Squeezer
 
-Phase 1 provides deterministic local compression with a Go CLI orchestrating a C++ core through cgo.
+Context-Squeezer is a deterministic Go CLI + C++ core library for compressing document text.
+
+## Version
+
+Current release: **1.0.0**.
 
 ## Requirements
 
@@ -9,6 +13,8 @@ Phase 1 provides deterministic local compression with a Go CLI orchestrating a C
 - Linux: `gcc`, `g++`
 - macOS: `clang`, `clang++`
 
+No third-party cgo dependencies are used beyond the native C++ core.
+
 ## Build
 
 ```bash
@@ -16,10 +22,9 @@ Phase 1 provides deterministic local compression with a Go CLI orchestrating a C
 ```
 
 Artifacts:
-
-- `build/native/lib/libcontextsqueeze.so` (Linux) or `build/native/lib/libcontextsqueeze.dylib` (macOS)
-- `build/native/bin/contextsqueeze_tests`
 - `build/bin/contextsqueeze`
+- `build/native/lib/libcontextsqueeze.so` (Linux) or `libcontextsqueeze.dylib` (macOS)
+- `build/native/bin/contextsqueeze_tests`
 
 ## Test
 
@@ -27,75 +32,100 @@ Artifacts:
 ./scripts/test.sh
 ```
 
-Runs native tests, `go test ./...`, identity smoke (`--aggr 0`), and bench validation on `testdata/sample.txt`.
-
-Optional format/lint gate:
+Also available:
 
 ```bash
 ./scripts/format.sh
 ```
 
-## Run
+## Supported Input Formats
 
-Version:
+- PDF
+- DOCX
+- HTML
+- TXT / MD
 
-```bash
-./build/bin/contextsqueeze --version
-```
+Source detection uses extension + magic bytes. Override detection with `--source`.
 
-Squeeze a file:
+## CLI Usage
 
-```bash
-./build/bin/contextsqueeze --aggr 6 --profile local ./path/to/input.txt
-```
-
-Stats mode:
+Squeeze to stdout:
 
 ```bash
-./build/bin/contextsqueeze --stats --aggr 6 ./path/to/input.txt
+./build/bin/contextsqueeze doc.pdf --max-tokens 8000 --profile api
 ```
 
-Bench mode (aggr 0..9 markdown table + recommendation):
+Emit JSON package:
 
 ```bash
-./build/bin/contextsqueeze bench ./testdata/sample.txt
+./build/bin/contextsqueeze page.html --json > out.json
 ```
 
-## Compression behavior (Phase 1)
+Write to file:
 
-Implemented deterministic algorithms:
+```bash
+./build/bin/contextsqueeze --input report.docx --out squeezed.txt --max-tokens 2000
+```
 
-- rule-based sentence segmentation (`. ? !` and paragraph boundaries)
-- repeated/boilerplate paragraph removal
-- near-duplicate sentence removal via TF cosine similarity with candidate buckets
-- low-information pruning with TF-IDF scoring and anchor protection
+Stats view:
 
-Anchors are always protected (`#` headings, code fences, URLs, numeric-heavy lines, all-caps heading-like lines).
+```bash
+./build/bin/contextsqueeze stats ./internal/ingest/fixtures/sample.txt --max-tokens 80
+```
+
+Bench table:
+
+```bash
+./build/bin/contextsqueeze bench ./internal/ingest/fixtures/sample.html --max-tokens 120
+```
+
+## JSON Schema
+
+`--json` emits stable UTF-8 JSON metadata fields:
+
+- `bytes_in`, `bytes_out`
+- `tokens_in_approx`, `tokens_out_approx`
+- `reduction_pct`
+- `aggressiveness`, `profile`
+- `budget_applied`, `truncated`
+- `source_type`, `warnings`
+- `text` (if valid UTF-8) OR `text_b64` (otherwise)
+
+## Token Approximation
+
+Budgeting uses a deterministic approximation:
+
+`approx_tokens = ceil(bytes/4) + whitespace_word_count`
+
+This is not a model tokenizer/BPE.
+
+## Guardrails
+
+- Default input max size: **50MB** (override with `CSQ_MAX_BYTES`)
+- Timeout cap in CLI for ingest + squeeze: **5s**
+- Unknown binary-like files are rejected (`unsupported binary file`)
 
 ## Troubleshooting
 
-Linux linker error (`libcontextsqueeze.so` not found):
+### PDF extraction quality
+
+- Scanned/image-only PDFs are not supported in Phase 2 (no OCR).
+- Some PDFs may produce limited text due to layout/encoding.
+
+### DOCX extraction errors
+
+- If `word/document.xml` is missing, extraction fails with a clear error.
+
+### Shared library load errors
+
+Linux:
 
 ```bash
 export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
 ```
 
-macOS linker error (`libcontextsqueeze.dylib` not found):
+macOS:
 
 ```bash
 export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
 ```
-
-## Performance & Quality Notes
-
-Guaranteed:
-
-- deterministic output for same input/options
-- no sentence reordering (only drops)
-- bench quality gates are deterministic: anchor retention, section coverage, keyword recall
-
-Not guaranteed in Phase 1:
-
-- semantic rewriting/paraphrasing
-- language-specific NLP beyond simple ASCII tokenization
-- cross-file streaming/chunking
