@@ -65,12 +65,47 @@ func TestProfileCommandOutput(t *testing.T) {
 	}
 	var out bytes.Buffer
 	var errb bytes.Buffer
-	rc := run([]string{"profile", "--max-memory-mb", "64", infile}, &out, &errb)
+	rc := run([]string{"profile", "--seconds", "1", "--max-memory-mb", "64", infile}, &out, &errb)
 	if rc != 0 {
 		t.Fatalf("profile failed: %s", errb.String())
 	}
 	s := out.String()
 	if !strings.Contains(s, "total time ms:") || !strings.Contains(s, "peak memory estimate bytes:") {
 		t.Fatalf("unexpected profile output: %s", s)
+	}
+}
+
+func TestBenchSuiteOutput(t *testing.T) {
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	rc := run([]string{"bench", "--suite", "default", "--runs", "1", "--warmup", "0", "--aggr", "6"}, &out, &errb)
+	if rc != 0 {
+		t.Fatalf("bench failed: %s", errb.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "| file | aggr | run |") || !strings.Contains(s, "| file | aggr | min ms") {
+		t.Fatalf("unexpected bench output: %s", s)
+	}
+}
+
+func TestBenchJSONSchemaVersion(t *testing.T) {
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	rc := run([]string{"bench", "--suite", "default", "--runs", "1", "--warmup", "0", "--aggr", "6", "--json"}, &out, &errb)
+	if rc != 0 {
+		t.Fatalf("bench json failed: %s", errb.String())
+	}
+	b := out.Bytes()
+	idx := bytes.LastIndex(b, []byte(`{
+  "schema_version"`))
+	if idx < 0 {
+		t.Fatalf("bench json payload not found: %s", out.String())
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b[idx:], &m); err != nil {
+		t.Fatalf("invalid bench json: %v", err)
+	}
+	if m["schema_version"] != "1" {
+		t.Fatalf("unexpected schema version: %v", m["schema_version"])
 	}
 }

@@ -1,0 +1,6 @@
+# BOILERPLATE
+NOTICE: repeated legal line. NOTICE: repeated legal line. NOTICE: repeated legal line.
+
+NOTICE: repeated legal line. NOTICE: repeated legal line. NOTICE: repeated legal line.
+
+Unique segment should remain.

@@ -6,6 +6,7 @@ package api
 #cgo darwin LDFLAGS: -L${SRCDIR}/../../build/native/lib -lcontextsqueeze -Wl,-rpath,${SRCDIR}/../../build/native/lib
 #include <stdlib.h>
 #include "contextsqueeze.h"
+#include "metrics.h"
 */
 import "C"
 
@@ -15,8 +16,25 @@ import (
 	"unsafe"
 )
 
+type NativeMetrics struct {
+	TokensParsed         uint64
+	SentencesTotal       uint64
+	SimilarityCandidates uint64
+	SimilarityPairs      uint64
+}
+
 func csqVersion() string {
 	return C.GoString(C.csq_version())
+}
+
+func csqLastMetrics() NativeMetrics {
+	m := C.csq_metrics_get()
+	return NativeMetrics{
+		TokensParsed:         uint64(m.tokens_parsed),
+		SentencesTotal:       uint64(m.sentences_total),
+		SimilarityCandidates: uint64(m.similarity_candidates_checked),
+		SimilarityPairs:      uint64(m.similarity_pairs_compared),
+	}
 }
 
 func csqSqueeze(in []byte, aggr int) ([]byte, error) {

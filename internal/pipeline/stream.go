@@ -3,10 +3,10 @@ package pipeline
 import (
 	"bytes"
 	"container/list"
+	"contextsqueezer/internal/metrics"
 	"contextsqueezer/internal/runtime"
 	"contextsqueezer/pkg/api"
 	"hash/fnv"
-	"sort"
 	"strings"
 	"time"
 )
@@ -15,15 +15,6 @@ const (
 	defaultChunkSentences = 500
 	defaultRegistryCap    = 100000
 )
-
-type timings struct {
-	Total      time.Duration
-	Segment    time.Duration
-	Dedupe     time.Duration
-	Prune      time.Duration
-	Reassembly time.Duration
-	PeakMem    int64
-}
 
 type RunConfig struct {
 	MaxMemoryMB int
@@ -84,20 +75,36 @@ func sentenceSignature(in []byte) uint64 {
 			uniq[t] = struct{}{}
 		}
 	}
-	arr := make([]string, 0, len(uniq))
-	for t := range uniq {
-		arr = append(arr, t)
+	type kv struct {
+		h uint64
+		t string
 	}
-	sort.Strings(arr)
-	if len(arr) > 6 {
-		arr = arr[:6]
+	top := make([]kv, 0, 6)
+	for tok := range uniq {
+		th := fnv.New64a()
+		_, _ = th.Write([]byte(tok))
+		item := kv{h: th.Sum64(), t: tok}
+		if len(top) < 6 {
+			top = append(top, item)
+			for i := len(top) - 1; i > 0 && top[i].h < top[i-1].h; i-- {
+				top[i], top[i-1] = top[i-1], top[i]
+			}
+			continue
+		}
+		if item.h >= top[len(top)-1].h {
+			continue
+		}
+		top[len(top)-1] = item
+		for i := len(top) - 1; i > 0 && top[i].h < top[i-1].h; i-- {
+			top[i], top[i-1] = top[i-1], top[i]
+		}
 	}
 	h := fnv.New64a()
-	for i, t := range arr {
+	for i, t := range top {
 		if i > 0 {
 			_, _ = h.Write([]byte{'|'})
 		}
-		_, _ = h.Write([]byte(t))
+		_, _ = h.Write([]byte(t.t))
 	}
 	return h.Sum64()
 }
@@ -157,13 +164,11 @@ func ensureHeadingContinuity(in []byte, out []byte, truncated bool) []byte {
 	return out
 }
 
-func squeezeStreamed(in []byte, opt api.Options, cfg RunConfig, tracker *runtime.MemoryTracker, warnings *[]string) ([]byte, timings, int, error) {
-	_ = cfg
-	t0 := time.Now()
-	t := timings{}
+func squeezeStreamed(in []byte, opt api.Options, _ RunConfig, tracker *runtime.MemoryTracker, warnings *[]string) ([]byte, metrics.StageMetrics, int, error) {
+	m := metrics.StageMetrics{}
 	segStart := time.Now()
 	chunks := splitChunks(in)
-	t.Segment = time.Since(segStart)
+	m.SegmentationMS = time.Since(segStart).Milliseconds()
 	reg := newSigRegistry(defaultRegistryCap)
 	keptChunks := make([][]byte, 0, len(chunks))
 	currentAggr := normalizeAggr(opt)
@@ -177,11 +182,16 @@ func squeezeStreamed(in []byte, opt api.Options, cfg RunConfig, tracker *runtime
 		}
 		pruneStart := time.Now()
 		out, err := api.SqueezeBytes(ch, api.Options{Aggressiveness: currentAggr, Profile: opt.Profile, MaxTokens: opt.MaxTokens})
-		t.Prune += time.Since(pruneStart)
+		m.PruneMS += time.Since(pruneStart).Milliseconds()
 		tracker.Release(int64(len(ch)))
 		if err != nil {
-			return nil, t, currentAggr, err
+			return nil, m, currentAggr, err
 		}
+		nm := api.LastNativeMetrics()
+		m.TokensParsed += nm.TokensParsed
+		m.SentencesTotal += nm.SentencesTotal
+		m.SimilarityCandidates += nm.SimilarityCandidates
+		m.SimilarityPairs += nm.SimilarityPairs
 
 		dedStart := time.Now()
 		sp := segmentSentences(out)
@@ -196,14 +206,13 @@ func squeezeStreamed(in []byte, opt api.Options, cfg RunConfig, tracker *runtime
 			_, _ = b.Write(sent)
 			_ = tracker.Add(int64(len(sent)) + 64)
 		}
-		t.Dedupe += time.Since(dedStart)
+		m.CrossChunkRegistryMS += time.Since(dedStart).Milliseconds()
 		keptChunks = append(keptChunks, b.Bytes())
 	}
 
 	reStart := time.Now()
 	out := bytes.Join(keptChunks, []byte("\n"))
-	t.Reassembly = time.Since(reStart)
-	t.Total = time.Since(t0)
-	t.PeakMem = tracker.Peak
-	return out, t, currentAggr, nil
+	m.AssemblyMS = time.Since(reStart).Milliseconds()
+	m.PeakMemoryEstimateB = tracker.Peak
+	return out, m, currentAggr, nil
 }

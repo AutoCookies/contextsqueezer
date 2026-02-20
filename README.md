@@ -4,7 +4,7 @@ Deterministic Go CLI + C++ core for document compression.
 
 ## Version
 
-Current release: **1.1.0**.
+Current release: **1.2.0**.
 
 ## Build & Test
 
@@ -27,26 +27,52 @@ Current release: **1.1.0**.
 ./build/bin/contextsqueeze --max-tokens 8000 --profile api doc.pdf
 ./build/bin/contextsqueeze --json page.html > out.json
 ./build/bin/contextsqueeze stats --source docx --max-tokens 2000 report.docx
-./build/bin/contextsqueeze bench --max-tokens 3000 ./testdata/sample.txt
-./build/bin/contextsqueeze profile --max-memory-mb 512 ./testdata/sample.txt
 ```
 
-## Phase 3 Scalability Additions
+## Benchmark Harness (Phase 4)
 
-- Chunked streaming pipeline for large documents (section-aware, fallback sentence windows).
-- Cross-chunk dedupe with deterministic signature registry.
-- Soft memory guardrail (`--max-memory-mb`, default 1024MB) with warning-based degradation.
-- `profile` command with deterministic stage timings:
-  - total
-  - segmentation
-  - dedupe
-  - prune
-  - reassembly
-  - peak memory estimate
+```bash
+./build/bin/contextsqueeze bench --suite default --runs 5 --warmup 1 --aggr 0..9 --max-tokens 0
+./build/bin/contextsqueeze bench --file testdata/bench/large.txt --runs 10 --aggr 6
+./build/bin/contextsqueeze bench --dir testdata/bench --pattern "*.txt" --runs 3
+```
+
+Bench output includes:
+
+- per-run rows
+- aggregate rows (min/median/p95)
+- SHA-256 digest checks for determinism (bench fails on mismatch)
+- optional JSON via `--json`
+
+## Profiling
+
+```bash
+./build/bin/contextsqueeze profile --cpu out/cpu.pprof --heap out/heap.pprof --seconds 10 testdata/bench/large.txt
+```
+
+Open pprof UI:
+
+```bash
+go tool pprof -http=:0 out/cpu.pprof
+```
+
+## Stats/Stage Timings
+
+`stats` prints stage timing and counters, including:
+
+- ingest
+- segmentation
+- tokenization
+- candidate filtering
+- similarity
+- pruning
+- assembly
+- cross-chunk registry
+- budgeting
 
 ## JSON Schema (Stable)
 
-`--json` output is unchanged and includes:
+`--json` output remains stable and includes:
 
 - `bytes_in`, `bytes_out`
 - `tokens_in_approx`, `tokens_out_approx`
@@ -79,3 +105,5 @@ Current release: **1.1.0**.
   ```bash
   export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
   ```
+
+See `docs/perf.md` for reproducible performance workflows.

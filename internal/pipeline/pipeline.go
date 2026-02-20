@@ -1,34 +1,52 @@
 package pipeline
 
 import (
-	"bytes"
+	"contextsqueezer/internal/metrics"
 	"contextsqueezer/internal/runtime"
 	"contextsqueezer/pkg/api"
 	"errors"
 	"math"
+	"time"
 )
 
 type Result struct {
-	Text            []byte   `json:"-"`
-	BytesIn         int      `json:"bytes_in"`
-	BytesOut        int      `json:"bytes_out"`
-	TokensInApprox  int      `json:"tokens_in_approx"`
-	TokensOutApprox int      `json:"tokens_out_approx"`
-	ReductionPct    float64  `json:"reduction_pct"`
-	Aggressiveness  int      `json:"aggressiveness"`
-	Profile         string   `json:"profile"`
-	BudgetApplied   bool     `json:"budget_applied"`
-	Truncated       bool     `json:"truncated"`
-	SourceType      string   `json:"source_type"`
-	Warnings        []string `json:"warnings"`
-	Timings         timings  `json:"-"`
+	Text            []byte               `json:"-"`
+	BytesIn         int                  `json:"bytes_in"`
+	BytesOut        int                  `json:"bytes_out"`
+	TokensInApprox  int                  `json:"tokens_in_approx"`
+	TokensOutApprox int                  `json:"tokens_out_approx"`
+	ReductionPct    float64              `json:"reduction_pct"`
+	Aggressiveness  int                  `json:"aggressiveness"`
+	Profile         string               `json:"profile"`
+	BudgetApplied   bool                 `json:"budget_applied"`
+	Truncated       bool                 `json:"truncated"`
+	SourceType      string               `json:"source_type"`
+	Warnings        []string             `json:"warnings"`
+	Metrics         metrics.StageMetrics `json:"metrics"`
+}
+
+func fastWordCount(in []byte) int {
+	inWord := false
+	count := 0
+	for _, b := range in {
+		ws := b == ' ' || b == '\n' || b == '\t' || b == '\r'
+		if ws {
+			inWord = false
+			continue
+		}
+		if !inWord {
+			count++
+			inWord = true
+		}
+	}
+	return count
 }
 
 func approxTokens(in []byte) int {
 	if len(in) == 0 {
 		return 0
 	}
-	words := len(bytes.Fields(in))
+	words := fastWordCount(in)
 	return int(math.Ceil(float64(len(in))/4.0)) + words
 }
 
@@ -76,21 +94,32 @@ func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings
 	best := in
 	current := normalizeAggr(opt)
 	tracker := runtime.NewMemoryTracker(cfg.MaxMemoryMB)
-	var t timings
 	allWarnings := append([]string{}, warnings...)
+	m := metrics.StageMetrics{}
+	budgetStart := time.Now()
 
 	for {
 		attempts++
 		if attempts > 10 {
 			break
 		}
-		out, ts, usedAggr, err := squeezeStreamed(in, api.Options{Aggressiveness: current, Profile: opt.Profile, MaxTokens: opt.MaxTokens}, cfg, tracker, &allWarnings)
+		out, stage, usedAggr, err := squeezeStreamed(in, api.Options{Aggressiveness: current, Profile: opt.Profile, MaxTokens: opt.MaxTokens}, cfg, tracker, &allWarnings)
 		if err != nil {
 			return Result{}, err
 		}
 		best = out
 		current = usedAggr
-		t = ts
+		m.SegmentationMS += stage.SegmentationMS
+		m.TokenizationMS += stage.TokenizationMS
+		m.CandidateFilterMS += stage.CandidateFilterMS
+		m.SimilarityMS += stage.SimilarityMS
+		m.PruneMS += stage.PruneMS
+		m.AssemblyMS += stage.AssemblyMS
+		m.CrossChunkRegistryMS += stage.CrossChunkRegistryMS
+		m.SimilarityCandidates += stage.SimilarityCandidates
+		m.SimilarityPairs += stage.SimilarityPairs
+		m.TokensParsed += stage.TokensParsed
+		m.SentencesTotal += stage.SentencesTotal
 		if opt.MaxTokens <= 0 || approxTokens(out) <= opt.MaxTokens || current >= 9 {
 			break
 		}
@@ -110,6 +139,8 @@ func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings
 	if opt.MaxTokens > 0 && approxTokens(best) > opt.MaxTokens {
 		return Result{}, errors.New("unable to satisfy max token budget")
 	}
+	m.BudgetLoopMS = time.Since(budgetStart).Milliseconds()
+	m.PeakMemoryEstimateB = tracker.Peak
 
 	return Result{
 		Text:            best,
@@ -124,6 +155,6 @@ func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings
 		Truncated:       truncated,
 		SourceType:      sourceType,
 		Warnings:        allWarnings,
-		Timings:         t,
+		Metrics:         m,
 	}, nil
 }

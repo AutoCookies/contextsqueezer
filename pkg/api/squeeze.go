@@ -37,3 +37,7 @@ func SqueezeBytes(in []byte, opt Options) ([]byte, error) {
 	}
 	return out, nil
 }
+
+func LastNativeMetrics() NativeMetrics {
+	return csqLastMetrics()
+}

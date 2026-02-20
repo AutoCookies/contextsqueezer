@@ -1,4 +1,5 @@
 #include "contextsqueeze.h"
+#include "metrics.h"
 
 #include <algorithm>
 #include <array>
@@ -16,7 +17,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.1.0";
+constexpr const char* kVersion = "1.2.0";
 
 struct Span {
   size_t start;
@@ -254,12 +255,14 @@ std::string squeeze_impl(std::string input, int aggr) {
 
   const auto sw = stopwords();
   std::vector<SentenceInfo> sentences;
+  csq_metrics_add_sentences(static_cast<uint64_t>(spans.size()));
   for (const auto& sp : spans) {
     std::string_view sv(filtered.data() + sp.start, sp.end - sp.start);
     SentenceInfo info;
     info.span = sp;
     info.anchor = is_anchor(sv);
     auto tokens = tokenize(sv, sw);
+    csq_metrics_add_tokens(static_cast<uint64_t>(tokens.size()));
     for (const auto& t : tokens) info.tf[t] += 1;
     for (const auto& kv : info.tf) info.uniq_tokens.push_back(kv.first);
     std::sort(info.uniq_tokens.begin(), info.uniq_tokens.end());
@@ -285,8 +288,11 @@ std::string squeeze_impl(std::string input, int aggr) {
     auto& cand = buckets[key];
     bool dup = false;
     size_t begin = cand.size() > 64 ? cand.size() - 64 : 0;
+    size_t checked = cand.size() - begin;
+    csq_metrics_add_candidates(static_cast<uint64_t>(checked));
     for (size_t j = begin; j < cand.size(); ++j) {
       size_t prev = cand[j];
+      csq_metrics_add_pairs(1);
       if (cosine_tf(sentences[prev].tf, sentences[i].tf) >= dup_threshold(aggr)) {
         dup = true;
         break;
@@ -372,6 +378,7 @@ extern "C" int csq_squeeze_ex(csq_view in, int aggressiveness, csq_buf* out) {
   if (in.data == nullptr) return 4;
 
   try {
+    csq_metrics_reset();
     if (aggressiveness < 0) aggressiveness = 0;
     if (aggressiveness > 9) aggressiveness = 9;
     std::string input(in.data, in.len);

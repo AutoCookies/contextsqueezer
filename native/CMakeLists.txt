@@ -13,12 +13,14 @@ endif()
 
 add_library(contextsqueeze SHARED
   src/contextsqueeze.cpp
+  src/metrics.cpp
   ../internal/core/signature_registry.cpp
 )
 
 target_include_directories(contextsqueeze
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../internal
 )
 
 set_target_properties(contextsqueeze PROPERTIES
@@ -33,6 +35,7 @@ add_executable(contextsqueeze_tests
 target_include_directories(contextsqueeze_tests
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../internal
 )
 
 target_link_libraries(contextsqueeze_tests
