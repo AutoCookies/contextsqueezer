@@ -3,7 +3,6 @@ package api
 import "fmt"
 
 type Options struct {
-	// Reserved for Phase 1+, keep now for forward-compat.
 	Aggressiveness int
 	MaxTokens      int
 	Profile        string
@@ -13,11 +12,26 @@ func Version() string {
 	return csqVersion()
 }
 
+func normalizeAggressiveness(opt Options) int {
+	if opt.Aggressiveness >= 0 && opt.Aggressiveness <= 9 {
+		return opt.Aggressiveness
+	}
+	if opt.Aggressiveness > 9 {
+		return 9
+	}
+	if opt.Profile == "local" {
+		return 6
+	}
+	if opt.Profile == "api" {
+		return 4
+	}
+	return 4
+}
+
 // SqueezeBytes must be stable and deterministic.
-// In Phase 0 it returns the input unchanged, but still calls into C++.
 func SqueezeBytes(in []byte, opt Options) ([]byte, error) {
-	_ = opt
-	out, err := csqSqueeze(in)
+	aggr := normalizeAggressiveness(opt)
+	out, err := csqSqueeze(in, aggr)
 	if err != nil {
 		return nil, fmt.Errorf("squeeze failed: %w", err)
 	}

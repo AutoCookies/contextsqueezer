@@ -11,25 +11,26 @@ func TestVersionNonEmpty(t *testing.T) {
 	}
 }
 
-func TestSqueezeBytesIdentity(t *testing.T) {
-	tests := []struct {
-		name  string
-		input []byte
-	}{
-		{name: "empty", input: []byte{}},
-		{name: "text", input: []byte("hello world")},
-		{name: "binary", input: []byte{'a', 0, 'b', '\n', 0, 'z'}},
+func TestSqueezeAggressivenessZeroIdentity(t *testing.T) {
+	in := []byte("alpha\n\nalpha\n\n# HEAD\nVisit https://example.com\n")
+	out, err := SqueezeBytes(in, Options{Aggressiveness: 0})
+	if err != nil {
+		t.Fatalf("SqueezeBytes returned error: %v", err)
 	}
+	if !bytes.Equal(in, out) {
+		t.Fatalf("expected identity output")
+	}
+}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			out, err := SqueezeBytes(tc.input, Options{})
-			if err != nil {
-				t.Fatalf("SqueezeBytes returned error: %v", err)
-			}
-			if !bytes.Equal(tc.input, out) {
-				t.Fatalf("output mismatch, got %v want %v", out, tc.input)
-			}
-		})
+func TestSqueezeAggressivenessHighShorter(t *testing.T) {
+	in := []byte("Noise sentence repeated. Noise sentence repeated. Noise sentence repeated.\n" +
+		"Unique insight with token quartz99 appears once.\n" +
+		"Noise sentence repeated.\n")
+	out, err := SqueezeBytes(in, Options{Aggressiveness: 6})
+	if err != nil {
+		t.Fatalf("SqueezeBytes returned error: %v", err)
+	}
+	if len(out) >= len(in) {
+		t.Fatalf("expected shorter output at higher aggressiveness; in=%d out=%d", len(in), len(out))
 	}
 }

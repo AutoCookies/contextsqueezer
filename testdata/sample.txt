@@ -1,0 +1,28 @@
+# CONTEXT SQUEEZER PHASE1 SAMPLE
+This section introduces repeated operational notes for testing compression.
+
+NOTICE: This document is generated automatically for internal review and may contain repeated legal boilerplate language that should be collapsed by the compressor while preserving the first occurrence for context and traceability. NOTICE: This document is generated automatically for internal review and may contain repeated legal boilerplate language that should be collapsed by the compressor while preserving the first occurrence for context and traceability.
+
+The cache layer reduces latency for requests in edge regions.
+The cache layer reduces latency for requests in edge regions.
+Caching reduces latency for requests in edge regions.
+
+Visit https://example.com/platform/runtime for deployment guidance.
+
+Build number 20240219 release train 12345 is active for this sample.
+
+```bash
+echo "code fences must stay"
+```
+
+Noise sentence with little value.
+Noise sentence with little value.
+Noise sentence with little value.
+Noise sentence with little value.
+Noise sentence with little value.
+
+## OPERATIONS
+Workers process queue batches every minute.
+Workers process queue batches every minute.
+Workers process queue batches every minute.
+Critical alert threshold token alphaomega9 should remain visible.

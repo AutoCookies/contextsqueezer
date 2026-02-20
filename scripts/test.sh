@@ -18,9 +18,20 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 
 input_file="${tmpdir}/input.txt"
-printf 'phase0 identity smoke\nline2\0raw\n' > "${input_file}"
+printf 'phase1 identity smoke\nline2\0raw\n' > "${input_file}"
 
 output_file="${tmpdir}/out.bin"
-"${ROOT_DIR}/build/bin/contextsqueeze" "${input_file}" > "${output_file}"
-
+"${ROOT_DIR}/build/bin/contextsqueeze" --aggr 0 "${input_file}" > "${output_file}"
 cmp -s "${input_file}" "${output_file}"
+
+"${ROOT_DIR}/build/bin/contextsqueeze" --version >/dev/null
+
+bench_output="$(${ROOT_DIR}/build/bin/contextsqueeze bench ${ROOT_DIR}/testdata/sample.txt)"
+printf '%s\n' "$bench_output" > "${tmpdir}/bench.txt"
+
+aggr6_reduction="$(awk -F'|' '/\| 6 \|/ {gsub(/ /,"",$4); print $4}' "${tmpdir}/bench.txt")"
+python - <<PY
+r = float("${aggr6_reduction}")
+if r < 30.0:
+    raise SystemExit(f"aggr=6 reduction too low: {r}")
+PY

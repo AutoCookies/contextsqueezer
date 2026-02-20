@@ -1,19 +1,13 @@
-# Context-Squeezer (Phase 0)
+# Context-Squeezer
 
-Phase 0 establishes the build/test foundation for a Go CLI orchestrator that calls a C++ core library through cgo.
-
-**Current behavior:** identity squeeze. Input bytes are returned unchanged. Real compression starts in Phase 1.
+Phase 1 provides deterministic local compression with a Go CLI orchestrating a C++ core through cgo.
 
 ## Requirements
 
 - Go 1.22+
 - CMake 3.16+
-- C++17 compiler:
-  - Linux: `g++`
-  - macOS: `clang++`
-- C compiler for cgo:
-  - Linux: `gcc`
-  - macOS: `clang`
+- Linux: `gcc`, `g++`
+- macOS: `clang`, `clang++`
 
 ## Build
 
@@ -23,9 +17,9 @@ Phase 0 establishes the build/test foundation for a Go CLI orchestrator that cal
 
 Artifacts:
 
-- Native shared library: `build/native/lib/libcontextsqueeze.so` (Linux) or `build/native/lib/libcontextsqueeze.dylib` (macOS)
-- Native tests: `build/native/bin/contextsqueeze_tests`
-- CLI binary: `build/bin/contextsqueeze`
+- `build/native/lib/libcontextsqueeze.so` (Linux) or `build/native/lib/libcontextsqueeze.dylib` (macOS)
+- `build/native/bin/contextsqueeze_tests`
+- `build/bin/contextsqueeze`
 
 ## Test
 
@@ -33,53 +27,75 @@ Artifacts:
 ./scripts/test.sh
 ```
 
-This runs:
+Runs native tests, `go test ./...`, identity smoke (`--aggr 0`), and bench validation on `testdata/sample.txt`.
 
-- C++ unit tests (`contextsqueeze_tests`)
-- `go test ./...`
-- End-to-end smoke test validating CLI output matches input exactly
-
-Optional formatting/lint gate:
+Optional format/lint gate:
 
 ```bash
 ./scripts/format.sh
 ```
 
-## Run examples
+## Run
 
-Print version:
+Version:
 
 ```bash
 ./build/bin/contextsqueeze --version
 ```
 
-Squeeze file (identity in Phase 0):
+Squeeze a file:
 
 ```bash
-./build/bin/contextsqueeze ./path/to/input.txt
+./build/bin/contextsqueeze --aggr 6 --profile local ./path/to/input.txt
 ```
+
+Stats mode:
+
+```bash
+./build/bin/contextsqueeze --stats --aggr 6 ./path/to/input.txt
+```
+
+Bench mode (aggr 0..9 markdown table + recommendation):
+
+```bash
+./build/bin/contextsqueeze bench ./testdata/sample.txt
+```
+
+## Compression behavior (Phase 1)
+
+Implemented deterministic algorithms:
+
+- rule-based sentence segmentation (`. ? !` and paragraph boundaries)
+- repeated/boilerplate paragraph removal
+- near-duplicate sentence removal via TF cosine similarity with candidate buckets
+- low-information pruning with TF-IDF scoring and anchor protection
+
+Anchors are always protected (`#` headings, code fences, URLs, numeric-heavy lines, all-caps heading-like lines).
 
 ## Troubleshooting
 
-### `error while loading shared libraries: libcontextsqueeze.so`
-
-Linux runtime linker cannot find the shared library. Run via scripts (`build.sh` and `test.sh`) or set:
+Linux linker error (`libcontextsqueeze.so` not found):
 
 ```bash
 export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
 ```
 
-### `Library not loaded: libcontextsqueeze.dylib`
-
-macOS runtime linker cannot find the shared library. Run via scripts or set:
+macOS linker error (`libcontextsqueeze.dylib` not found):
 
 ```bash
 export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
 ```
 
-### cgo compiler errors
+## Performance & Quality Notes
 
-Ensure toolchain is installed and available on PATH:
+Guaranteed:
 
-- Linux: `gcc`, `g++`
-- macOS: Xcode command line tools (`clang`, `clang++`)
+- deterministic output for same input/options
+- no sentence reordering (only drops)
+- bench quality gates are deterministic: anchor retention, section coverage, keyword recall
+
+Not guaranteed in Phase 1:
+
+- semantic rewriting/paraphrasing
+- language-specific NLP beyond simple ASCII tokenization
+- cross-file streaming/chunking

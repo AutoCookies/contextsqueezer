@@ -17,14 +17,9 @@ typedef struct {
   size_t len;
 } csq_buf;
 
-// Identity transform for Phase 0
-// Returns 0 on success, non-zero error code on failure.
 int csq_squeeze(csq_view in, csq_buf* out);
-
-// Frees buffer allocated by csq_squeeze
+int csq_squeeze_ex(csq_view in, int aggressiveness, csq_buf* out);
 void csq_free(csq_buf* buf);
-
-// Returns a static version string like "0.1.0"
 const char* csq_version(void);
 
 #ifdef __cplusplus
