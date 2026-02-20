@@ -1,0 +1,21 @@
+# INCIDENT REPORT
+
+System overview: The service processes customer events and logs diagnostics for each transaction.
+System overview: The service processes customer events and logs diagnostics for each transaction.
+System overview: The service processes customer events and logs diagnostics for each transaction.
+
+DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER DISCLAIMER.
+
+## TIMELINE
+
+At 10:30, node 12 handled request id 998877 and wrote status 200 with latency 42 ms.
+At 10:30, node 12 handled request id 998877 and wrote status 200 with latency 42 ms.
+At 11:45, node 12 handled request id 998878 and wrote status 500 with latency 95 ms.
+Reference URL: https://status.example.com/incidents/998877
+
+```sql
+SELECT * FROM events WHERE incident_id = 998877;
+```
+
+Action items include cache invalidation, retry backoff tuning, and runbook updates for on-call engineers.
+Action items include cache invalidation, retry backoff tuning, and runbook updates for on-call engineers.
