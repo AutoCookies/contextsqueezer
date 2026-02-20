@@ -13,6 +13,7 @@ endif()
 
 add_library(contextsqueeze SHARED
   src/contextsqueeze.cpp
+  ../internal/core/signature_registry.cpp
 )
 
 target_include_directories(contextsqueeze

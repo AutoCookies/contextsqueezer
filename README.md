@@ -1,87 +1,52 @@
 # Context-Squeezer
 
-Context-Squeezer is a deterministic Go CLI + C++ core library for compressing document text.
+Deterministic Go CLI + C++ core for document compression.
 
 ## Version
 
-Current release: **1.0.0**.
+Current release: **1.1.0**.
 
-## Requirements
-
-- Go 1.22+
-- CMake 3.16+
-- Linux: `gcc`, `g++`
-- macOS: `clang`, `clang++`
-
-No third-party cgo dependencies are used beyond the native C++ core.
-
-## Build
+## Build & Test
 
 ```bash
 ./scripts/build.sh
-```
-
-Artifacts:
-- `build/bin/contextsqueeze`
-- `build/native/lib/libcontextsqueeze.so` (Linux) or `libcontextsqueeze.dylib` (macOS)
-- `build/native/bin/contextsqueeze_tests`
-
-## Test
-
-```bash
 ./scripts/test.sh
-```
-
-Also available:
-
-```bash
 ./scripts/format.sh
 ```
 
-## Supported Input Formats
+## Supported Formats
 
 - PDF
 - DOCX
 - HTML
-- TXT / MD
+- TXT/MD
 
-Source detection uses extension + magic bytes. Override detection with `--source`.
-
-## CLI Usage
-
-Squeeze to stdout:
+## Core Usage
 
 ```bash
-./build/bin/contextsqueeze doc.pdf --max-tokens 8000 --profile api
+./build/bin/contextsqueeze --max-tokens 8000 --profile api doc.pdf
+./build/bin/contextsqueeze --json page.html > out.json
+./build/bin/contextsqueeze stats --source docx --max-tokens 2000 report.docx
+./build/bin/contextsqueeze bench --max-tokens 3000 ./testdata/sample.txt
+./build/bin/contextsqueeze profile --max-memory-mb 512 ./testdata/sample.txt
 ```
 
-Emit JSON package:
+## Phase 3 Scalability Additions
 
-```bash
-./build/bin/contextsqueeze page.html --json > out.json
-```
+- Chunked streaming pipeline for large documents (section-aware, fallback sentence windows).
+- Cross-chunk dedupe with deterministic signature registry.
+- Soft memory guardrail (`--max-memory-mb`, default 1024MB) with warning-based degradation.
+- `profile` command with deterministic stage timings:
+  - total
+  - segmentation
+  - dedupe
+  - prune
+  - reassembly
+  - peak memory estimate
 
-Write to file:
+## JSON Schema (Stable)
 
-```bash
-./build/bin/contextsqueeze --input report.docx --out squeezed.txt --max-tokens 2000
-```
-
-Stats view:
-
-```bash
-./build/bin/contextsqueeze stats ./internal/ingest/fixtures/sample.txt --max-tokens 80
-```
-
-Bench table:
-
-```bash
-./build/bin/contextsqueeze bench ./internal/ingest/fixtures/sample.html --max-tokens 120
-```
-
-## JSON Schema
-
-`--json` emits stable UTF-8 JSON metadata fields:
+`--json` output is unchanged and includes:
 
 - `bytes_in`, `bytes_out`
 - `tokens_in_approx`, `tokens_out_approx`
@@ -89,43 +54,28 @@ Bench table:
 - `aggressiveness`, `profile`
 - `budget_applied`, `truncated`
 - `source_type`, `warnings`
-- `text` (if valid UTF-8) OR `text_b64` (otherwise)
+- `text` (valid UTF-8) OR `text_b64`
 
 ## Token Approximation
 
-Budgeting uses a deterministic approximation:
-
 `approx_tokens = ceil(bytes/4) + whitespace_word_count`
-
-This is not a model tokenizer/BPE.
 
 ## Guardrails
 
-- Default input max size: **50MB** (override with `CSQ_MAX_BYTES`)
-- Timeout cap in CLI for ingest + squeeze: **5s**
-- Unknown binary-like files are rejected (`unsupported binary file`)
+- Input size cap default: `50MB` (`CSQ_MAX_BYTES` to override)
+- CLI timeout: `5s`
+- Unknown binary-like files rejected
+- Soft memory ceiling default: `1024MB` (`--max-memory-mb`)
 
 ## Troubleshooting
 
-### PDF extraction quality
-
-- Scanned/image-only PDFs are not supported in Phase 2 (no OCR).
-- Some PDFs may produce limited text due to layout/encoding.
-
-### DOCX extraction errors
-
-- If `word/document.xml` is missing, extraction fails with a clear error.
-
-### Shared library load errors
-
-Linux:
-
-```bash
-export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
-```
-
-macOS:
-
-```bash
-export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
-```
+- Scanned/image-only PDFs are not OCR-processed.
+- DOCX must contain `word/document.xml` (or parseable XML fallback fixture format).
+- Linux runtime linking:
+  ```bash
+  export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
+  ```
+- macOS runtime linking:
+  ```bash
+  export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
+  ```

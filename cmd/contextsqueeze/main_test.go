@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -53,5 +54,23 @@ func TestJSONSchemaBase64Field(t *testing.T) {
 	}
 	if _, ok := m["text_b64"]; !ok {
 		t.Fatal("expected text_b64 field")
+	}
+}
+
+func TestProfileCommandOutput(t *testing.T) {
+	tmp := t.TempDir()
+	infile := filepath.Join(tmp, "in.txt")
+	if err := os.WriteFile(infile, []byte("# H\nline one. line two.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	rc := run([]string{"profile", "--max-memory-mb", "64", infile}, &out, &errb)
+	if rc != 0 {
+		t.Fatalf("profile failed: %s", errb.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "total time ms:") || !strings.Contains(s, "peak memory estimate bytes:") {
+		t.Fatalf("unexpected profile output: %s", s)
 	}
 }

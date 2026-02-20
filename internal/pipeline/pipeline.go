@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"contextsqueezer/internal/runtime"
 	"contextsqueezer/pkg/api"
 	"errors"
 	"math"
@@ -20,6 +21,7 @@ type Result struct {
 	Truncated       bool     `json:"truncated"`
 	SourceType      string   `json:"source_type"`
 	Warnings        []string `json:"warnings"`
+	Timings         timings  `json:"-"`
 }
 
 func approxTokens(in []byte) int {
@@ -59,24 +61,36 @@ func Run(in []byte, opt api.Options) ([]byte, error) {
 }
 
 func RunResult(in []byte, opt api.Options, sourceType string, warnings []string) (Result, error) {
+	return RunResultWithConfig(in, opt, sourceType, warnings, RunConfig{MaxMemoryMB: 1024})
+}
+
+func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings []string, cfg RunConfig) (Result, error) {
 	if sourceType == "" {
 		sourceType = "text"
 	}
-	aggr := normalizeAggr(opt)
+	if cfg.MaxMemoryMB <= 0 {
+		cfg.MaxMemoryMB = 1024
+	}
 	budgetApplied := opt.MaxTokens > 0
 	attempts := 0
 	best := in
-	current := aggr
+	current := normalizeAggr(opt)
+	tracker := runtime.NewMemoryTracker(cfg.MaxMemoryMB)
+	var t timings
+	allWarnings := append([]string{}, warnings...)
+
 	for {
 		attempts++
 		if attempts > 10 {
 			break
 		}
-		out, err := api.SqueezeBytes(in, api.Options{Aggressiveness: current, MaxTokens: opt.MaxTokens, Profile: opt.Profile})
+		out, ts, usedAggr, err := squeezeStreamed(in, api.Options{Aggressiveness: current, Profile: opt.Profile, MaxTokens: opt.MaxTokens}, cfg, tracker, &allWarnings)
 		if err != nil {
 			return Result{}, err
 		}
 		best = out
+		current = usedAggr
+		t = ts
 		if opt.MaxTokens <= 0 || approxTokens(out) <= opt.MaxTokens || current >= 9 {
 			break
 		}
@@ -92,9 +106,11 @@ func RunResult(in []byte, opt api.Options, sourceType string, warnings []string)
 		}
 		truncated = true
 	}
+	best = ensureHeadingContinuity(in, best, truncated)
 	if opt.MaxTokens > 0 && approxTokens(best) > opt.MaxTokens {
 		return Result{}, errors.New("unable to satisfy max token budget")
 	}
+
 	return Result{
 		Text:            best,
 		BytesIn:         len(in),
@@ -107,6 +123,7 @@ func RunResult(in []byte, opt api.Options, sourceType string, warnings []string)
 		BudgetApplied:   budgetApplied,
 		Truncated:       truncated,
 		SourceType:      sourceType,
-		Warnings:        warnings,
+		Warnings:        allWarnings,
+		Timings:         t,
 	}, nil
 }

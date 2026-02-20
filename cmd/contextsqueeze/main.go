@@ -62,6 +62,7 @@ func runSqueeze(args []string, stdout io.Writer, stderr io.Writer, statsMode boo
 	aggr := fs.Int("aggr", -1, "aggressiveness 0..9")
 	profile := fs.String("profile", "", "profile local|api")
 	maxTokens := fs.Int("max-tokens", 0, "approx token budget")
+	maxMemMB := fs.Int("max-memory-mb", 1024, "soft memory ceiling in MB")
 	asJSON := fs.Bool("json", false, "emit json")
 	source := fs.String("source", "auto", "source override: auto|pdf|docx|html|text")
 	if err := fs.Parse(args); err != nil {
@@ -85,7 +86,13 @@ func runSqueeze(args []string, stdout io.Writer, stderr io.Writer, statsMode boo
 		return 1
 	}
 
-	res, err := pipeline.RunResult(ing.Text, api.Options{Aggressiveness: *aggr, MaxTokens: *maxTokens, Profile: *profile}, ing.SourceType, ing.Warnings)
+	res, err := pipeline.RunResultWithConfig(
+		ing.Text,
+		api.Options{Aggressiveness: *aggr, MaxTokens: *maxTokens, Profile: *profile},
+		ing.SourceType,
+		ing.Warnings,
+		pipeline.RunConfig{MaxMemoryMB: *maxMemMB},
+	)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			_, _ = fmt.Fprintln(stderr, "timeout exceeded while squeezing")
@@ -110,19 +117,9 @@ func runSqueeze(args []string, stdout io.Writer, stderr io.Writer, statsMode boo
 	}
 
 	if *asJSON {
-		jr := jsonResult{
-			BytesIn:         res.BytesIn,
-			BytesOut:        res.BytesOut,
-			TokensInApprox:  res.TokensInApprox,
-			TokensOutApprox: res.TokensOutApprox,
-			ReductionPct:    res.ReductionPct,
-			Aggressiveness:  res.Aggressiveness,
-			Profile:         res.Profile,
-			BudgetApplied:   res.BudgetApplied,
-			Truncated:       res.Truncated,
-			SourceType:      res.SourceType,
-			Warnings:        res.Warnings,
-		}
+		jr := jsonResult{BytesIn: res.BytesIn, BytesOut: res.BytesOut, TokensInApprox: res.TokensInApprox, TokensOutApprox: res.TokensOutApprox,
+			ReductionPct: res.ReductionPct, Aggressiveness: res.Aggressiveness, Profile: res.Profile, BudgetApplied: res.BudgetApplied,
+			Truncated: res.Truncated, SourceType: res.SourceType, Warnings: res.Warnings}
 		if utf8.Valid(res.Text) {
 			jr.Text = string(res.Text)
 		} else {
@@ -148,11 +145,48 @@ func runSqueeze(args []string, stdout io.Writer, stderr io.Writer, statsMode boo
 	return 0
 }
 
+func runProfile(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("contextsqueeze profile", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	inPath := fs.String("input", "", "input file")
+	maxMemMB := fs.Int("max-memory-mb", 1024, "soft memory ceiling in MB")
+	aggr := fs.Int("aggr", -1, "aggressiveness")
+	source := fs.String("source", "auto", "source override")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path, err := parseInputArg(fs, *inPath)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, "usage: contextsqueeze profile <file>")
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ing, err := ingest.Run(ctx, path, *source)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "ingest error: %v\n", err)
+		return 1
+	}
+	res, err := pipeline.RunResultWithConfig(ing.Text, api.Options{Aggressiveness: *aggr}, ing.SourceType, ing.Warnings, pipeline.RunConfig{MaxMemoryMB: *maxMemMB})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "profile error: %v\n", err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "total time ms: %d\n", res.Timings.Total.Milliseconds())
+	_, _ = fmt.Fprintf(stdout, "segmentation time ms: %d\n", res.Timings.Segment.Milliseconds())
+	_, _ = fmt.Fprintf(stdout, "dedupe time ms: %d\n", res.Timings.Dedupe.Milliseconds())
+	_, _ = fmt.Fprintf(stdout, "prune time ms: %d\n", res.Timings.Prune.Milliseconds())
+	_, _ = fmt.Fprintf(stdout, "reassembly time ms: %d\n", res.Timings.Reassembly.Milliseconds())
+	_, _ = fmt.Fprintf(stdout, "peak memory estimate bytes: %d\n", res.Timings.PeakMem)
+	return 0
+}
+
 func runBench(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("contextsqueeze bench", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	inPath := fs.String("input", "", "input file")
 	maxTokens := fs.Int("max-tokens", 0, "approx token budget")
+	maxMemMB := fs.Int("max-memory-mb", 1024, "soft memory ceiling in MB")
 	source := fs.String("source", "auto", "source override")
 	profile := fs.String("profile", "", "profile")
 	if err := fs.Parse(args); err != nil {
@@ -173,7 +207,7 @@ func runBench(args []string, stdout io.Writer, stderr io.Writer) int {
 	_, _ = fmt.Fprintln(stdout, "| aggr | tokens out | reduction % | truncated |")
 	_, _ = fmt.Fprintln(stdout, "|---:|---:|---:|:---:|")
 	for a := 0; a <= 9; a++ {
-		res, err := pipeline.RunResult(ing.Text, api.Options{Aggressiveness: a, MaxTokens: *maxTokens, Profile: *profile}, ing.SourceType, ing.Warnings)
+		res, err := pipeline.RunResultWithConfig(ing.Text, api.Options{Aggressiveness: a, MaxTokens: *maxTokens, Profile: *profile}, ing.SourceType, ing.Warnings, pipeline.RunConfig{MaxMemoryMB: *maxMemMB})
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "bench error at aggr %d: %v\n", a, err)
 			return 1
@@ -190,11 +224,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return runBench(args[1:], stdout, stderr)
 		case "stats":
 			return runSqueeze(args[1:], stdout, stderr, true)
+		case "profile":
+			return runProfile(args[1:], stdout, stderr)
 		}
 	}
 	return runSqueeze(args, stdout, stderr, false)
 }
 
-func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
-}
+func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
