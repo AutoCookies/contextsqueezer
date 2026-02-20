@@ -1,0 +1,8 @@
+build/
+
+# Go
+*.test
+*.out
+
+# macOS
+.DS_Store
