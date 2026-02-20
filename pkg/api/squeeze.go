@@ -10,7 +10,7 @@ package api
 import "C"
 
 import (
-	"errors"
+	"fmt"
 	"unsafe"
 )
 
@@ -24,8 +24,29 @@ func Version() string {
 	return C.GoString(C.csq_version())
 }
 
+func normalizeAggressiveness(opt Options) int {
+	aggr := opt.Aggressiveness
+	if aggr < 0 {
+		switch opt.Profile {
+		case "local":
+			aggr = 6
+		case "api":
+			aggr = 4
+		default:
+			aggr = 0
+		}
+	}
+	if aggr < 0 {
+		aggr = 0
+	}
+	if aggr > 9 {
+		aggr = 9
+	}
+	return aggr
+}
+
 func SqueezeBytes(in []byte, opt Options) ([]byte, error) {
-	_ = opt
+	aggr := normalizeAggressiveness(opt)
 
 	var inPtr unsafe.Pointer
 	if len(in) > 0 {
@@ -34,9 +55,12 @@ func SqueezeBytes(in []byte, opt Options) ([]byte, error) {
 
 	inView := C.csq_view{data: (*C.char)(inPtr), len: C.size_t(len(in))}
 	out := C.csq_buf{}
-	ret := C.csq_squeeze(inView, &out)
+	ret := C.csq_squeeze_ex(inView, C.int(aggr), &out)
 	if ret != 0 {
-		return nil, errors.New("csq_squeeze failed")
+		ret = C.csq_squeeze(inView, &out)
+		if ret != 0 {
+			return nil, fmt.Errorf("csq_squeeze failed: %d", int(ret))
+		}
 	}
 	defer C.csq_free(&out)
 

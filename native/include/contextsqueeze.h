@@ -18,6 +18,7 @@ typedef struct {
 } csq_buf;
 
 int csq_squeeze(csq_view in, csq_buf* out);
+int csq_squeeze_ex(csq_view in, int aggressiveness, csq_buf* out);
 void csq_free(csq_buf* buf);
 const char* csq_version(void);
 

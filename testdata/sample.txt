@@ -1,0 +1,31 @@
+# SYSTEM OVERVIEW
+This section describes the system overview and architecture in plain language and repeats key context.
+This section describes the system overview and architecture in plain language and repeats key context.
+This section describes the system overview and architecture in plain language and repeats key context.
+This section describes the system overview and architecture in plain language and repeats key context.
+
+NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL.
+
+NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL NOTICE: CONFIDENTIAL.
+
+## API CONTRACTS
+The API endpoint https://example.com/v1/process must be preserved for integration and client compatibility.
+The API endpoint https://example.com/v1/process must be preserved for integration and client compatibility.
+The API endpoint https://example.com/v1/process must be preserved for integration and client compatibility.
+Reference ticket 20240123 and incident 9988 for audit.
+
+### DETAILS
+Alpha beta gamma delta epsilon explains behavior for each module and pipeline stage.
+Alpha beta gamma delta epsilon explains behavior for each module and pipeline stage.
+Alpha beta gamma delta epsilon explains behavior for each module and pipeline stage.
+Alpha beta gamma delta epsilon explains behavior for each module and pipeline stage.
+
+```shell
+curl -s https://example.com/v1/process
+```
+
+CONCLUSION
+Short note.
+Short note.
+Short note.
+Short note.
