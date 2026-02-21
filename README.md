@@ -226,6 +226,6 @@ dist/
 
 <div align="center">
 
-**Context-Squeezer** · v1.0.0 · MIT License
+**Context-Squeezer** · v1.0.0 · License
 
 </div>
