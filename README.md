@@ -11,6 +11,7 @@
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#build--test)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/nnkfW83n)
 
 </div>
 
