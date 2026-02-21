@@ -9,7 +9,7 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org/)
 [![C++](https://img.shields.io/badge/C++-Core-00599C?style=flat-square&logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=flat-square)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-NC--Copyleft-orange?style=flat-square)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#build--test)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/nnkfW83n)
 
