@@ -109,6 +109,9 @@ func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings
 		}
 		best = out
 		current = usedAggr
+		if opt.MaxTokens > 0 {
+			runtime.Debugf("budget loop: attempt %d, tokens approx %d", attempts, approxTokens(out))
+		}
 		m.SegmentationMS += stage.SegmentationMS
 		m.TokenizationMS += stage.TokenizationMS
 		m.CandidateFilterMS += stage.CandidateFilterMS
@@ -128,6 +131,7 @@ func RunResultWithConfig(in []byte, opt api.Options, sourceType string, warnings
 
 	truncated := false
 	if opt.MaxTokens > 0 && approxTokens(best) > opt.MaxTokens {
+		runtime.Infof("budget loop failed to satisfy %d tokens; forcing truncation", opt.MaxTokens)
 		var err error
 		best, err = truncateToBudget(best, opt.MaxTokens)
 		if err != nil {

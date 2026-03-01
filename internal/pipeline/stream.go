@@ -173,20 +173,24 @@ func squeezeStreamed(in []byte, opt api.Options, _ RunConfig, tracker *runtime.M
 	keptChunks := make([][]byte, 0, len(chunks))
 	currentAggr := normalizeAggr(opt)
 
-	for _, ch := range chunks {
-		if tracker.Add(int64(len(ch))) {
-			if currentAggr > 0 {
-				currentAggr--
+	for i, ch := range chunks {
+		tracker.Add(int64(len(ch)))
+		runtime.Debugf("processing chunk %d/%d (size=%d)", i+1, len(chunks), len(ch))
+		if tracker.Current > tracker.Limit {
+			if currentAggr < 9 {
+				currentAggr++
+				runtime.Warnf("memory limit approached (%d MiB > %d MiB); increasing aggressiveness to %d",
+					tracker.Current/1024/1024, tracker.Limit/1024/1024, currentAggr)
+				*warnings = append(*warnings, "memory soft limit exceeded; reducing aggressiveness")
 			}
-			*warnings = append(*warnings, "memory soft limit exceeded; reducing aggressiveness")
 		}
 		pruneStart := time.Now()
 		out, err := api.SqueezeBytes(ch, api.Options{Aggressiveness: currentAggr, Profile: opt.Profile, MaxTokens: opt.MaxTokens})
 		m.PruneMS += time.Since(pruneStart).Milliseconds()
-		tracker.Release(int64(len(ch)))
 		if err != nil {
 			return nil, m, currentAggr, err
 		}
+		// The following metrics are from the last native squeeze call
 		nm := api.LastNativeMetrics()
 		m.TokensParsed += nm.TokensParsed
 		m.SentencesTotal += nm.SentencesTotal
@@ -208,11 +212,14 @@ func squeezeStreamed(in []byte, opt api.Options, _ RunConfig, tracker *runtime.M
 		}
 		m.CrossChunkRegistryMS += time.Since(dedStart).Milliseconds()
 		keptChunks = append(keptChunks, b.Bytes())
+		tracker.Release(int64(len(ch))) // Done with original chunk
 	}
 
 	reStart := time.Now()
 	out := bytes.Join(keptChunks, []byte("\n"))
 	m.AssemblyMS = time.Since(reStart).Milliseconds()
 	m.PeakMemoryEstimateB = tracker.Peak
+	runtime.Infof("squeeze complete: chunks=%d, sentences=%d, tokens=%d",
+		len(chunks), m.SentencesTotal, m.TokensParsed)
 	return out, m, currentAggr, nil
 }

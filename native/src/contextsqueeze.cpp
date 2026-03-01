@@ -19,6 +19,12 @@ namespace {
 
 constexpr const char* kVersion = "1.0.0";
 
+thread_local std::string g_last_error;
+
+void set_last_error(const std::string& msg) {
+  g_last_error = msg;
+}
+
 struct Span {
   size_t start;
   size_t end;
@@ -195,8 +201,13 @@ double drop_ratio(int aggr) {
   return k[static_cast<size_t>(aggr)];
 }
 
-std::string squeeze_impl(std::string input, int aggr) {
-  if (aggr <= 0 || input.empty()) return input;
+std::string squeeze_impl(std::string input, int aggr, csq_progress_cb cb, void* user_data) {
+  if (aggr <= 0 || input.empty()) {
+    if (cb) cb(100.0f, user_data);
+    return input;
+  }
+
+  if (cb) cb(5.0f, user_data);
 
   std::vector<Span> blocks;
   size_t pstart = 0;
@@ -214,6 +225,7 @@ std::string squeeze_impl(std::string input, int aggr) {
 
   std::vector<bool> block_drop(blocks.size(), false);
   std::unordered_map<uint64_t, size_t> first_seen;
+  float last_pct = -1.0f;
   for (size_t i = 0; i < blocks.size(); ++i) {
     const Span& b = blocks[i];
     if (b.end <= b.start) continue;
@@ -239,24 +251,36 @@ std::string squeeze_impl(std::string input, int aggr) {
       }
       if (static_cast<double>(uniq) / static_cast<double>(sv.size()) < 0.08) block_drop[i] = true;
     }
+
+    float current_pct = 5.0f + 10.0f * (float)i / (float)blocks.size();
+    if (cb && (int)current_pct != (int)last_pct) {
+      cb(current_pct, user_data);
+      last_pct = current_pct;
+    }
   }
+
+  if (cb) cb(20.0f, user_data);
 
   std::string filtered;
   filtered.reserve(input.size());
   for (size_t i = 0; i < blocks.size(); ++i) {
     if (!block_drop[i]) {
-      const Span& b = blocks[i];
-      filtered.append(input.data() + b.start, b.end - b.start);
+      filtered.append(input.data() + blocks[i].start, blocks[i].end - blocks[i].start);
     }
   }
 
   auto spans = segment_sentences(filtered);
-  if (spans.empty()) return filtered;
+  if (spans.empty()) {
+    if (cb) cb(100.0f, user_data);
+    return filtered;
+  }
 
   const auto sw = stopwords();
   std::vector<SentenceInfo> sentences;
   csq_metrics_add_sentences(static_cast<uint64_t>(spans.size()));
-  for (const auto& sp : spans) {
+  last_pct = -1.0f;
+  for (size_t i = 0; i < spans.size(); ++i) {
+    const auto& sp = spans[i];
     std::string_view sv(filtered.data() + sp.start, sp.end - sp.start);
     SentenceInfo info;
     info.span = sp;
@@ -267,6 +291,12 @@ std::string squeeze_impl(std::string input, int aggr) {
     for (const auto& kv : info.tf) info.uniq_tokens.push_back(kv.first);
     std::sort(info.uniq_tokens.begin(), info.uniq_tokens.end());
     sentences.push_back(std::move(info));
+
+    float current_pct = 20.0f + 30.0f * (float)i / (float)spans.size();
+    if (cb && (int)current_pct != (int)last_pct) {
+      cb(current_pct, user_data);
+      last_pct = current_pct;
+    }
   }
 
   auto token_signature = [](const SentenceInfo& s) {
@@ -282,6 +312,7 @@ std::string squeeze_impl(std::string input, int aggr) {
   };
 
   std::unordered_map<std::string, std::vector<size_t>> buckets;
+  last_pct = -1.0f;
   for (size_t i = 0; i < sentences.size(); ++i) {
     if (sentences[i].anchor) continue;
     std::string key = std::to_string((sentences[i].span.end - sentences[i].span.start) / 20) + "|" + token_signature(sentences[i]);
@@ -290,6 +321,11 @@ std::string squeeze_impl(std::string input, int aggr) {
     size_t begin = cand.size() > 64 ? cand.size() - 64 : 0;
     size_t checked = cand.size() - begin;
     csq_metrics_add_candidates(static_cast<uint64_t>(checked));
+    float current_pct = 50.0f + 20.0f * (float)i / (float)sentences.size();
+    if (cb && (int)current_pct != (int)last_pct) {
+      cb(current_pct, user_data);
+      last_pct = current_pct;
+    }
     for (size_t j = begin; j < cand.size(); ++j) {
       size_t prev = cand[j];
       csq_metrics_add_pairs(1);
@@ -305,6 +341,8 @@ std::string squeeze_impl(std::string input, int aggr) {
     }
   }
 
+  if (cb) cb(70.0f, user_data);
+
   std::unordered_map<std::string, int> df;
   int n = 0;
   for (const auto& s : sentences) {
@@ -312,6 +350,8 @@ std::string squeeze_impl(std::string input, int aggr) {
     ++n;
     for (const auto& kv : s.tf) df[kv.first] += 1;
   }
+
+  if (cb) cb(80.0f, user_data);
 
   for (auto& s : sentences) {
     if (s.drop) continue;
@@ -333,6 +373,8 @@ std::string squeeze_impl(std::string input, int aggr) {
     }
   }
 
+  if (cb) cb(90.0f, user_data);
+
   std::vector<std::pair<double, size_t>> candidates;
   for (size_t i = 0; i < sentences.size(); ++i) {
     if (!sentences[i].drop && !sentences[i].anchor) candidates.push_back({sentences[i].score, i});
@@ -351,40 +393,58 @@ std::string squeeze_impl(std::string input, int aggr) {
   for (const auto& s : sentences) {
     if (!s.drop) out.append(filtered.data() + s.span.start, s.span.end - s.span.start);
   }
+  if (cb) cb(100.0f, user_data);
   return out;
 }
 
 int copy_to_cbuf(const std::string& s, csq_buf* out) {
   out->data = nullptr;
   out->len = 0;
-  if (s.empty()) return 0;
+  if (s.empty()) return CSQ_OK;
   void* raw = std::malloc(s.size());
-  if (raw == nullptr) return 2;
+  if (raw == nullptr) {
+    set_last_error("failed to allocate memory for output buffer");
+    return CSQ_ERR_MALLOC;
+  }
   std::memcpy(raw, s.data(), s.size());
   out->data = static_cast<char*>(raw);
   out->len = s.size();
-  return 0;
+  return CSQ_OK;
 }
 
 }  // namespace
 
-extern "C" int csq_squeeze(csq_view in, csq_buf* out) { return csq_squeeze_ex(in, 0, out); }
+extern "C" int csq_squeeze(csq_view in, csq_buf* out) { return csq_squeeze_progress(in, 0, nullptr, nullptr, out); }
 
 extern "C" int csq_squeeze_ex(csq_view in, int aggressiveness, csq_buf* out) {
-  if (out == nullptr) return 1;
+  return csq_squeeze_progress(in, aggressiveness, nullptr, nullptr, out);
+}
+
+extern "C" int csq_squeeze_progress(csq_view in, int aggressiveness, csq_progress_cb cb, void* user_data, csq_buf* out) {
+  if (out == nullptr) {
+    set_last_error("output buffer pointer is null");
+    return CSQ_ERR_INVALID_ARG;
+  }
   out->data = nullptr;
   out->len = 0;
-  if (in.len == 0) return 0;
-  if (in.data == nullptr) return 4;
+  if (in.len == 0) return CSQ_OK;
+  if (in.data == nullptr) {
+    set_last_error("input data pointer is null");
+    return CSQ_ERR_INVALID_DATA;
+  }
 
   try {
     csq_metrics_reset();
     if (aggressiveness < 0) aggressiveness = 0;
     if (aggressiveness > 9) aggressiveness = 9;
     std::string input(in.data, in.len);
-    return copy_to_cbuf(squeeze_impl(std::move(input), aggressiveness), out);
+    return copy_to_cbuf(squeeze_impl(std::move(input), aggressiveness, cb, user_data), out);
+  } catch (const std::exception& e) {
+    set_last_error(std::string("internal error: ") + e.what());
+    return CSQ_ERR_INTERNAL;
   } catch (...) {
-    return 3;
+    set_last_error("unknown internal error");
+    return CSQ_ERR_INTERNAL;
   }
 }
 
@@ -396,3 +456,5 @@ extern "C" void csq_free(csq_buf* buf) {
 }
 
 extern "C" const char* csq_version(void) { return kVersion; }
+
+extern "C" const char* csq_last_error(void) { return g_last_error.c_str(); }
