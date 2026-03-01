@@ -37,8 +37,17 @@ func normalizeAggressiveness(opt Options) int {
 
 // SqueezeBytes must be stable and deterministic.
 func SqueezeBytes(in []byte, opt Options) ([]byte, error) {
+	return SqueezeBytesWithProgress(in, opt, nil)
+}
+
+// SqueezeBytesWithProgress supports an optional progress callback.
+func SqueezeBytesWithProgress(in []byte, opt Options, cb func(float32)) ([]byte, error) {
 	aggr := normalizeAggressiveness(opt)
-	out, err := csqSqueeze(in, aggr)
+	var pCB *func(float32)
+	if cb != nil {
+		pCB = &cb
+	}
+	out, err := csqSqueeze(in, aggr, pCB)
 	if err != nil {
 		return nil, fmt.Errorf("squeeze failed: %w", err)
 	}

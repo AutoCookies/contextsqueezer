@@ -10,8 +10,11 @@ import (
 
 func TestJSONSchemaLock(t *testing.T) {
 	cmd := exec.Command("go", "run", "../../cmd/contextsqueeze", "--json", "../../testdata/bench/small.txt")
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("command failed: %v\n%s", err, string(exitErr.Stderr))
+		}
 		t.Fatalf("command failed: %v\n%s", err, string(out))
 	}
 	var m map[string]any

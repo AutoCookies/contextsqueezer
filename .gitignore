@@ -1,4 +1,6 @@
 build/
+build_static/
+examples/cpp_integration/build
 dist/
 
 # Native/shared artifacts

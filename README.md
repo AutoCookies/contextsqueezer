@@ -8,30 +8,89 @@
 
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org/)
 [![C++](https://img.shields.io/badge/C++-Core-00599C?style=flat-square&logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=flat-square)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-NC--Copyleft-orange?style=flat-square)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#build--test)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/nnkfW83n)
 
-</div>
+**Context-Squeezer** is a high-performance, local CLI tool and library designed to compress large documents to fit within LLM token budgets while maintaining semantic structure and determinism.
 
 ---
 
-## What is Context-Squeezer?
+## 🚀 Key Features
 
-**Context-Squeezer** is a fast, local CLI tool that compresses documents to fit within a given token budget — without rewriting or reordering your content. It is built with a Go CLI front-end and a high-performance C++ core.
+- 🔒 **Deterministic**: Identical input and options always produce identical output.
+- ✂️ **Drop-only**: No rewriting or reordering — only optimal omission of less relevant sections.
+- 🔌 **Edge-Ready**: Supports static linking and SIMD optimizations (AVX2, NEON) for ultra-fast local inference.
+- ⚓ **Anchor-aware**: Preserves critical sections (headings, code blocks, URLs) automatically.
+- 📊 **Observability**: Built-in structured logging and fine-grained metrics for production monitoring.
 
-It is designed for use-cases like feeding documents into LLM context windows, summarising large files, and batch document analysis — all without any network calls or external model dependencies.
+---
 
-### Key Guarantees
+## 🛠️ Installation & Building
 
-| Guarantee | Description |
-|---|---|
-| 🔒 **Deterministic** | Identical input + options always produce identical output |
-| ✂️ **Drop-only** | No sentence reordering, no AI rewriting — only omission |
-| ⚓ **Anchor-aware** | Preserved sections held unless budget truncation forces removal |
-| 🎯 **Token-budget** | `--max-tokens` is strictly honoured with fallback truncation |
-| 🌐 **Fully local** | Zero network calls, zero model dependencies |
+### Standard Build (Shared Library)
+```bash
+make build
+```
+
+### Production Static Build (Edge Deployment)
+Creates a standalone binary with no external C++ library dependencies.
+```bash
+make build-static
+```
+
+### Technical Requirements
+- Go 1.22+
+- CMake 3.16+
+- GCC/Clang with C++17 support
+
+---
+
+## 📦 Third-Party Integration
+
+Context-Squeezer is designed to be easily integrated into other projects.
+
+### Go Integration
+```go
+import "contextsqueezer/pkg/api"
+
+opt := api.Options{MaxTokens: 2000, Profile: "api"}
+squeezed, err := api.SqueezeBytes(input, opt)
+```
+
+### C++ Integration (via CMake)
+```cmake
+find_package(ContextSqueeze REQUIRED)
+target_link_libraries(your_app PRIVATE ContextSqueeze::contextsqueeze)
+```
+
+### New C API Features
+- **Progress Callbacks**: Track long-running compression jobs.
+- **Robust Error Handling**: Thread-local error strings via `csq_last_error()`.
+
+---
+
+## 🔧 Observability & Tuning
+
+### Logging
+Set `CSQ_DEBUG=1` to enable detailed stage-by-stage debug logging.
+
+### Memory Management
+Context-Squeezer implements a streaming chunked processor for large files. Use `MaxMemoryMB` in the pipeline configuration to control peak resident memory usage.
+
+---
+
+## 📈 Benchmarking
+
+The tool includes a built-in benchmark suite to verify performance and determinism:
+```bash
+./build/bin/contextsqueeze bench --suite default --runs 5
+```
+
+---
+
+## 📄 License
+This project is licensed under the terms of the LICENSE file included in the repository.
+
+</div>
 
 ---
 
@@ -72,12 +131,12 @@ It is designed for use-cases like feeding documents into LLM context windows, su
 ```
 
 > **Runtime linking (Linux)**
-> ```bash
+> ```
 > export LD_LIBRARY_PATH="$(pwd)/build/native/lib:${LD_LIBRARY_PATH}"
 > ```
 >
 > **Runtime linking (macOS)**
-> ```bash
+> ```
 > export DYLD_LIBRARY_PATH="$(pwd)/build/native/lib:${DYLD_LIBRARY_PATH}"
 > ```
 

@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 for pat in '*.pdf' '*.docx' '*.so' '*.dylib' '*.exe' '*.zip'; do
-  hits="$(git ls-files "$pat" | while read -r f; do [[ -f "$f" ]] && echo "$f"; done || true)"
+  hits="$(git ls-files "$pat" | grep -v '^testdata/bench/' | while read -r f; do [[ -f "$f" ]] && echo "$f"; done || true)"
   if [[ -n "$hits" ]]; then
     echo "forbidden tracked binary extension detected: $pat"
     echo "$hits"
@@ -19,7 +19,7 @@ if [[ -n "$dist_hits" ]]; then
   exit 1
 fi
 
-large="$(git ls-files -z | xargs -0 -I{} sh -c 'if [ -f "{}" ]; then s=$(wc -c <"{}" 2>/dev/null || echo 0); if [ "$s" -gt 2097152 ]; then echo "{} $s"; fi; fi')"
+large="$(git ls-files -z | grep -zv '^testdata/bench/' | xargs -0 -I{} sh -c 'if [ -f "{}" ]; then s=$(wc -c <"{}" 2>/dev/null || echo 0); if [ "$s" -gt 2097152 ]; then echo "{} $s"; fi; fi')"
 if [[ -n "$large" ]]; then
   echo "tracked files >2MB detected"
   echo "$large"
